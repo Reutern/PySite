@@ -135,24 +135,65 @@ def read_sites(seq, motif):
 	return (sites_plus, sites_reverse)
 			
  
+# Parameter reading function (from file)
+def read_parameters(parameterFile):
+	params = {} 
+	if not os.path.isfile(parameterFile):
+		sys.exit(parameterFile + " is not a file!")
+	f_in = open(parameterFile, 'r')
+	for line in f_in.readlines():
+		if '=' not in line:	# comment or empty line
+			continue
+		line = line.split('=')
+	   	key_tmp = line[0].strip()
+		value_tmp = ''
+		if len(line) > 2:
+	   		sys.exit("Wrong format! Can not read " + parameterFile)	 
+		if not line[1].isspace():
+		   	value_tmp = line[1].split()[0].strip()	# second split to get rid of comments	   			
+		params.update({key_tmp : value_tmp})
+	f_in.close()
+	return params 
+
+
+# Parameter writing function (to file)
+def save_parameters(parameterFile, params):
+	f_in = open(parameterFile, 'w')
+	for par in params.keys():
+		f_in.write(par + ' = ' + str(params[par]) + '\n')
+	f_in.close()
+	return params 
+
+ 
 def main(argv=None):
 
 	seqFile = ''
 	motifFile = ''
 	outputDir = '.'
-	backFile = ''
+	backgroundFile = ''
 	pseudo_counts = 0
 
-	try:
-		opts, args = getopt.getopt(argv,"hs:m:c:o:b:",[])
-	except getopt.GetoptError:
-		print 'PySite.py -s <input_seq> -m <input_motif> -o <output_dir> [-c <pseudo_counts def=0.0> -b <background_track>]'
-		sys.exit(2)
+	# Parameter file and reading conditions
+	parameterFile = 'param.txt'
+	read_parameter_file = False
+	save_parameter_file = True
 
+	doc_string = 'PySite.py -s <input_seq> -m <input_motif> -o <output_dir> [-p <parameterFile> -c <pseudo_counts def=0.0> -b <background_track>]'
+
+	try:
+		opts, args = getopt.getopt(argv,"hs:m:c:o:b:p:",[])
+	except getopt.GetoptError:
+		print doc_string
+		sys.exit(2)
 	for opt, arg in opts:
 		if opt == '-h':
-			print 'PySite.py -s <input_seq> -m <input_motif> -o <output_dir> [-c <pseudo_counts def=0.0> -b <background_track>]'
+			print doc_string
 			sys.exit()
+		elif opt in ("-p"):
+			parameterFile = arg
+			read_parameter_file = True
+			save_parameter_file = False
+			break
 		elif opt in ("-s"):
 			seqFile = arg
 		elif opt in ("-m"):
@@ -162,8 +203,31 @@ def main(argv=None):
 		elif opt in ("-o"):
 			outputDir = arg
 		elif opt in ("-b"):
-			backFile = arg
-		
+			backgroundFile = arg
+
+	# Read parameter file		
+	if(seqFile == '' or motifFile == ''):
+		print 'Reading Parameters'
+		read_parameter_file = True
+		save_parameter_file = False
+
+	if (read_parameter_file):
+		params = read_parameters(parameterFile) 
+		seqFile = params['seqFile']
+		motifFile = params['motifFile']
+		outputDir = params['outputDir']
+		backgroundFile = params['backgroundFile']
+		pseudo_counts = float(params['pseudo_counts'])
+
+	# Save parameters if not specified otherwise
+	if (save_parameter_file):
+		params = {}
+	   	params['seqFile'] = seqFile
+		params['motifFile'] = motifFile
+		params['outputDir'] = outputDir 
+		params['backgroundFile'] = backgroundFile 
+		params['pseudo_counts'] = pseudo_counts 
+		params = save_parameters(parameterFile, params) 
 
 	# Test whether input files exist
 	if not os.path.isfile(seqFile):
@@ -173,8 +237,8 @@ def main(argv=None):
 
 	# Read background track File if existing
 	background = ''
-	if os.path.isfile(backFile):
-		background = np.genfromtxt(backFile)	
+	if os.path.isfile(backgroundFile):
+		background = np.genfromtxt(backgroundFile)	
 	try: 
 		(seqs, seqNames) = read_fasta(seqFile)
 		(motifs, motifNames) = read_wtmx(motifFile, pseudo_counts)
@@ -193,11 +257,11 @@ def main(argv=None):
 				length = background[idx_seq].size
 				range_bg = range(1, length + 1)
 				ax2.plot(range_bg, background[idx_seq], linestyle='-', linewidth=2, color = 'k', alpha = 0.5, 
-						label="MNase dyad score max = " + str("%.3g" % max(background[idx_seq])))		
+						label="background = " + str("%.3g" % max(background[idx_seq])))		
 			ax.plot(range_idx, sites_reverse, 
-                linestyle='-', linewidth=4, alpha = 0.75, label="- strand  max = " + str("%.3g" % max(sites_reverse)))	
+				linestyle='-', linewidth=4, alpha = 0.75, label="- strand  max = " + str("%.3g" % max(sites_reverse)))	
 			ax.plot(range_idx, sites_plus, 
-                linestyle='-', linewidth=4, alpha = 0.75, label="+ strand  max = " + str("%.3g" % max(sites_plus)))
+				linestyle='-', linewidth=4, alpha = 0.75, label="+ strand  max = " + str("%.3g" % max(sites_plus)))
 			
 			# Show the strongest binding sites
 			fig.gca().set_position((.1, .3, .8, .6))
@@ -223,7 +287,7 @@ def main(argv=None):
 			ax.set_xlabel("position")
 			ax.set_ylabel("binding weight")
 			if background != '':
-				ax2.set_ylabel("MNase dyad score")
+				ax2.set_ylabel("background")
 			fig_name = outputDir + '/sites_' + seqNames[idx_seq] + '_' + motifNames[idx_motif] + '.png' 
 			fig.savefig(fig_name, bbox_inches='tight')
 
