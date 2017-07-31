@@ -190,6 +190,7 @@ def main(argv=None):
 	seq_file = ''
 	motif_file = ''
 	output_dir = '.'
+	site_threshold = 0.05
 	background_file = ''
 	pseudo_counts = 0
 	padding = True
@@ -199,16 +200,17 @@ def main(argv=None):
 	read_parameter_file = False
 	save_parameter_file = True
 
-	doc_string = 'PySite.py -s <input_seq> -m <input_motif> -o <output_dir> [-p <parameter_file> -c <pseudo_counts def=0.0> -b <background_track> -u (disable seq. padding)]'
+	doc_string = 'PySite.py -s <input_seq> -m <input_motif> -o <output_dir> '
+	doc_string_optional = ' [-t <site_threshold> -p <parameter_file> -c <pseudo_counts def=0.0> -b <background_track> -u (disable seq. padding)]'
 
 	try:
-		opts, args = getopt.getopt(argv,"hs:m:c:o:b:p:u",[])
+		opts, args = getopt.getopt(argv,"hs:m:c:o:t:b:p:u",[])
 	except getopt.GetoptError:
-		print doc_string
+		print doc_string + doc_string_optional
 		sys.exit(2)
 	for opt, arg in opts:
 		if opt == '-h':
-			print doc_string
+			print doc_string + doc_string_optional
 			sys.exit()
 		elif opt in ("-p"):
 			parameter_file = arg
@@ -223,6 +225,8 @@ def main(argv=None):
 			pseudo_counts = float(arg)		
 		elif opt in ("-o"):
 			output_dir = arg
+		elif opt in ("-t"):
+			site_threshold = float(arg)		
 		elif opt in ("-b"):
 			background_file = arg
 		elif opt in ("-u"):
@@ -252,6 +256,10 @@ def main(argv=None):
 		except KeyError:
 			pass	# do not update predefined parameter
 		try:
+			site_threshold = float(params['site_threshold'])
+		except (KeyError, ValueError):
+			pass	# do not update predefined parameter
+		try:
 			pseudo_counts = float(params['pseudo_counts'])
 		except (KeyError, ValueError):
 			pass	# do not update predefined parameter
@@ -263,6 +271,7 @@ def main(argv=None):
 		params['motif_file'] = motif_file
 		params['output_dir'] = output_dir 
 		params['background_file'] = background_file 
+		params['site_threshold'] = site_threshold 		
 		params['pseudo_counts'] = pseudo_counts 
 		params['padding'] = padding
 		params = save_parameters(parameter_file, params) 
@@ -283,11 +292,31 @@ def main(argv=None):
 	except ValueError:
 		print "Reading Error"
 		sys.exit()
+	
+	# go through all sequences and motifs	
 	for idx_seq, seq in enumerate(seqs):
 		for idx_motif, motif in enumerate(motifs):
 			(sites_plus, sites_reverse) = read_sites(seq, motif, padding)
 			Nsites = len(sites_plus)
-			range_idx = range(-len(motif)+1, Nsites + 1 - len(motif))
+			motif_len = len(motif)
+			range_idx = range(-motif_len+1, Nsites + 1 - motif_len)
+
+			# write list of binding sites to a file
+			f_so = open(output_dir + '/sites_' + seq_names[idx_seq] + '_' + motif_names[idx_motif] + '.txt' ,'w')
+			if padding:
+				seq_padded = ('N' * motif_len + seq + 'N' * motif_len)
+			else:
+				seq_padded = ('-' * motif_len + seq + '-' * motif_len)
+			for idx_pos in range(1, len(sites_plus)-1):
+				seq_tmp = seq_padded[idx_pos:idx_pos+motif_len]
+				seq_rev_tmp = reverse_complement(seq_tmp)
+				if sites_plus[idx_pos] > site_threshold:
+					f_so.write(str(idx_pos-motif_len+1) + '\t' + seq_tmp + '\t+\t' + str(sites_plus[idx_pos]) + '\n')
+				if sites_reverse[idx_pos] > site_threshold:					
+					f_so.write(str(idx_pos-motif_len+1) + '\t' + seq_rev_tmp + '\t-\t' + str(sites_reverse[idx_pos]) + '\n')
+			f_so.close()								
+								
+			# plot background and bidning site composition
 			fig, ax = pylab.subplots(ncols=1)
 			if background != '':
 				ax2 = ax.twinx()
@@ -300,7 +329,7 @@ def main(argv=None):
 			ax.plot(range_idx, sites_plus, 
 				linestyle='-', linewidth=4, alpha = 0.75, label="+ strand  max = " + str("%.3g" % max(sites_plus)))
 			
-			# Show the strongest binding sites
+			# show the strongest binding sites
 			fig.gca().set_position((.1, .3, .8, .6))
 			motif_length = len(motif)			
 			best_plus = np.argmax(sites_plus) - motif_length

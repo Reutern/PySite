@@ -1,0 +1,6 @@
+seq_file = Input/seq_test.fa
+motif_file = Input/factor_test.wtmx
+output_dir = ./
+site_threshold = 0.01
+background_file = 
+pseudo_counts = 0
