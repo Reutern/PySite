@@ -20,7 +20,7 @@ baseDic = {'A':0, 'a':0, 'C':1, 'c':1, 'G':2, 'g':2, 'T':3, 't':3}
 # A simple function that reads the input sequences in the FASTA format
 def read_fasta(seq_file):
 	seqs = []
-	seqNames = []
+	seq_names = []
 	f_in = open(seq_file, 'r')
 	while(True):
 		# Read name
@@ -30,7 +30,7 @@ def read_fasta(seq_file):
 		elif line_name[0] != '>':
 			continue	# Line does not belong to a sequence. Read new line!
 		elif line_name[0] == '>':
-			seqNames.append(line_name.strip()[1:])
+			seq_names.append(line_name.strip()[1:])
 
 		# Read sequence 
 		line_seq = f_in.readline().strip()
@@ -42,15 +42,15 @@ def read_fasta(seq_file):
 				return ValueError
 		seqs.append(line_seq)
 
-	assert(len(seqNames) == len(seqs))
+	assert(len(seq_names) == len(seqs))
 	f_in.close()
-	return (seqs, seqNames)
+	return (seqs, seq_names)
 
 
 # A function that reads the motif file
 def read_wtmx(motif_file, pseudo_counts):
 	motifs = []
-	motifNames = []
+	motif_names = []
 	f_in = open(motif_file, 'r')
 	while(True):
 		# Read name
@@ -61,7 +61,7 @@ def read_wtmx(motif_file, pseudo_counts):
 			continue		# Line does not belong to a sequence. Read new line!
 		elif line_name[0] == '>':
 			(name_tmp, length) = line_name[1:].split()
-			motifNames.append(name_tmp)
+			motif_names.append(name_tmp)
 				
 		pwm = np.zeros([int(length), 4])
 		# Read pwm positions
@@ -78,10 +78,10 @@ def read_wtmx(motif_file, pseudo_counts):
 			sum_row = sum(pwm[0])
 			pwm += sum_row * pseudo_counts
 		motifs.append(pwm)
-	assert(len(motifNames) == len(motifs))
+	assert(len(motif_names) == len(motifs))
 	f_in.close()
 
-	return (motifs, motifNames)
+	return (motifs, motif_names)
 
 
 # A function to build the reverse complement of a single sequence
@@ -249,8 +249,8 @@ def main(argv=None):
 	if os.path.isfile(background_file):
 		background = np.genfromtxt(background_file)	
 	try: 
-		(seqs, seqNames) = read_fasta(seq_file)
-		(motifs, motifNames) = read_wtmx(motif_file, pseudo_counts)
+		(seqs, seq_names) = read_fasta(seq_file)
+		(motifs, motif_names) = read_wtmx(motif_file, pseudo_counts)
 	except ValueError:
 		print "Reading Error"
 		sys.exit()
@@ -288,7 +288,7 @@ def main(argv=None):
 			fig.text(.1, .05, ' -  strand:  ' + seq_flank_1 + '_' + seq_site + '_' + seq_flank_2)
 
 
-			title_tmp = "{0} sites in {1}".format(motifNames[idx_motif], seqNames[idx_seq])
+			title_tmp = "{0} sites in {1}".format(motif_names[idx_motif], seq_names[idx_seq])
 			plt.title(title_tmp, size = 18)
    			ax.legend(loc='upper right', fontsize = 10)
 			if background != '':
@@ -297,7 +297,7 @@ def main(argv=None):
 			ax.set_ylabel("binding weight")
 			if background != '':
 				ax2.set_ylabel("background")
-			fig_name = output_dir + '/sites_' + seqNames[idx_seq] + '_' + motifNames[idx_motif] + '.png' 
+			fig_name = output_dir + '/sites_' + seq_names[idx_seq] + '_' + motif_names[idx_motif] + '.png' 
 			fig.savefig(fig_name, bbox_inches='tight')
 
 
