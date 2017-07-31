@@ -111,10 +111,16 @@ def reverse_complement(seq):
 
 
 # A function for reading the sites of a single motif in a sequnce
-def read_sites(seq, motif):
+def read_sites(seq, motif, padding=True):
 	seqLength = len(seq)
 	motifLength = len(motif)
-	Npos = seqLength - motifLength + 1
+	Npos = seqLength + motifLength + 1
+
+	# Extend the sequence on both sites with 'N' or '-' if padding is disabled
+	if padding:
+		seq_padded = 'N' * motifLength + seq + 'N' * motifLength
+	else:
+		seq_padded = '-' * motifLength + seq + '-' * motifLength
 
 	# get the reference score for the consensus site
 	weight_consensus = 1
@@ -127,7 +133,7 @@ def read_sites(seq, motif):
 	for pos in range(Npos):
 		weight_plus = 1
 		weight_reverse = 1
-		seq_tmp = seq[pos:pos+motifLength]
+		seq_tmp = seq_padded[pos:pos+motifLength]
 		seq_tmp_reverse = reverse_complement(seq_tmp)
 		for idx in range(motifLength):
 			base_plus = baseDic[seq_tmp[idx]]
@@ -146,6 +152,7 @@ def read_sites(seq, motif):
 				weight_reverse = 0					# if position is missing (base = '-'), score no binding
 		sites_plus[pos] = weight_plus / weight_consensus		
 		sites_reverse[pos] = weight_reverse / weight_consensus		
+		
 	return (sites_plus, sites_reverse)
 			
  
@@ -185,16 +192,17 @@ def main(argv=None):
 	output_dir = '.'
 	background_file = ''
 	pseudo_counts = 0
+	padding = True
 
 	# Parameter file and reading conditions
 	parameter_file = 'param.txt'
 	read_parameter_file = False
 	save_parameter_file = True
 
-	doc_string = 'PySite.py -s <input_seq> -m <input_motif> -o <output_dir> [-p <parameter_file> -c <pseudo_counts def=0.0> -b <background_track>]'
+	doc_string = 'PySite.py -s <input_seq> -m <input_motif> -o <output_dir> [-p <parameter_file> -c <pseudo_counts def=0.0> -b <background_track> -u (disable seq. padding)]'
 
 	try:
-		opts, args = getopt.getopt(argv,"hs:m:c:o:b:p:",[])
+		opts, args = getopt.getopt(argv,"hs:m:c:o:b:p:u",[])
 	except getopt.GetoptError:
 		print doc_string
 		sys.exit(2)
@@ -217,6 +225,8 @@ def main(argv=None):
 			output_dir = arg
 		elif opt in ("-b"):
 			background_file = arg
+		elif opt in ("-u"):
+			padding = False
 
 	# Check if all important parameters are set
 	if(seq_file == '' or motif_file == '' or output_dir == ''):
@@ -238,6 +248,10 @@ def main(argv=None):
 		except KeyError:
 			pass	# do not update predefined parameter
 		try:
+			padding = params['padding']
+		except KeyError:
+			pass	# do not update predefined parameter
+		try:
 			pseudo_counts = float(params['pseudo_counts'])
 		except (KeyError, ValueError):
 			pass	# do not update predefined parameter
@@ -250,6 +264,7 @@ def main(argv=None):
 		params['output_dir'] = output_dir 
 		params['background_file'] = background_file 
 		params['pseudo_counts'] = pseudo_counts 
+		params['padding'] = padding
 		params = save_parameters(parameter_file, params) 
 
 	# Test whether input files exist
@@ -268,17 +283,16 @@ def main(argv=None):
 	except ValueError:
 		print "Reading Error"
 		sys.exit()
-	scores_avg = np.zeros(142)
 	for idx_seq, seq in enumerate(seqs):
 		for idx_motif, motif in enumerate(motifs):
-			(sites_plus, sites_reverse) = read_sites(seq, motif)
+			(sites_plus, sites_reverse) = read_sites(seq, motif, padding)
 			Nsites = len(sites_plus)
-			range_idx = range(1, Nsites + 1)
+			range_idx = range(-len(motif)+1, Nsites + 1 - len(motif))
 			fig, ax = pylab.subplots(ncols=1)
 			if background != '':
 				ax2 = ax.twinx()
 				length = background[idx_seq].size
-				range_bg = range(1, length + 1)
+				range_bg = range(1, length + 1 - 2 * len(motif))
 				ax2.plot(range_bg, background[idx_seq], linestyle='-', linewidth=2, color = 'k', alpha = 0.5, 
 						label="background = " + str("%.3g" % max(background[idx_seq])))		
 			ax.plot(range_idx, sites_reverse, 
@@ -289,13 +303,13 @@ def main(argv=None):
 			# Show the strongest binding sites
 			fig.gca().set_position((.1, .3, .8, .6))
 			motif_length = len(motif)			
-			best_plus = np.argmax(sites_plus)
+			best_plus = np.argmax(sites_plus) - motif_length
 			seq_flank_1 = seq[max(best_plus-10, 0):best_plus]
 			seq_site = seq[best_plus:best_plus+motif_length]
 			seq_flank_2 = seq[best_plus+motif_length:min(best_plus+motif_length+10, len(seq))]
 			fig.text(.1, .1, '+ strand:  ' + seq_flank_1 + '_' + seq_site + '_' + seq_flank_2)
 
-			best_reverse = np.argmax(sites_reverse)
+			best_reverse = np.argmax(sites_reverse) - motif_length
 			seq_flank_1 = seq[max(best_reverse-10, 0):best_reverse]
 			seq_site = seq[best_reverse:best_reverse+motif_length]
 			seq_flank_2 = seq[best_reverse+motif_length:min(best_reverse+motif_length+10, len(seq))]
@@ -304,6 +318,7 @@ def main(argv=None):
 			title_tmp = "{0} sites in {1}".format(motif_names[idx_motif], seq_names[idx_seq])
 			plt.title(title_tmp, size = 18)
    			ax.legend(loc='upper right', fontsize = 10)
+   			ax.set_xlim([-len(motif)+1, Nsites + 1 - len(motif)])
 			if background != '':
 	   			ax2.legend(loc='upper left', fontsize = 10)
 			ax.set_xlabel("position")
