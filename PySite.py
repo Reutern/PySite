@@ -15,7 +15,7 @@ import os.path
 plt.style.use('ggplot')
 plt.rcParams['axes.facecolor']='w'
 
-baseDic = {'A':0, 'a':0, 'C':1, 'c':1, 'G':2, 'g':2, 'T':3, 't':3}
+baseDic = {'A':0, 'a':0, 'C':1, 'c':1, 'G':2, 'g':2, 'T':3, 't':3, 'N':10, 'n':10, '-':100}
 
 # A simple function that reads the input sequences in the FASTA format
 def read_fasta(seq_file):
@@ -37,7 +37,7 @@ def read_fasta(seq_file):
 
 		# Check sequence 
 		for base in line_seq:
-			if(base not in ['A', 'a', 'C', 'c', 'G', 'g', 'T', 't']):
+			if(base not in baseDic.keys()):
 				print("Error in file {0}: {1} is not a legal base!".format(seq_file, base))
 				return ValueError
 		seqs.append(line_seq)
@@ -98,6 +98,10 @@ def reverse_complement(seq):
 			base_reverse = 'C'
 		elif base in ['T', 't']:
 			base_reverse = 'A'
+		elif base in ['N', 'n']:
+			base_reverse = 'N'
+		elif base == '-':
+			base_reverse = '-'
 		else:
 			print("Error in function: reverse_complement! {0} is not a legal base".format(base))
 			return ValueError
@@ -127,9 +131,19 @@ def read_sites(seq, motif):
 		seq_tmp_reverse = reverse_complement(seq_tmp)
 		for idx in range(motifLength):
 			base_plus = baseDic[seq_tmp[idx]]
-			weight_plus *= motif[idx, base_plus]
+			if base_plus < 4:
+				weight_plus *= motif[idx, base_plus]
+			elif base_plus == 10:
+				weight_plus *= min(motif[idx,:])	# if base is a N, score worst possible option
+			elif base_plus == 100:
+				weight_plus = 0						# if position is missing (base = '-'), score no binding
 			base_reverse = baseDic[seq_tmp_reverse[idx]]
-			weight_reverse *= motif[idx, base_reverse]
+			if base_reverse < 4:
+				weight_reverse *= motif[idx, base_reverse]
+			elif base_reverse == 10:
+				weight_reverse *= min(motif[idx,:])	# if base is a N, score worst possible option
+			elif base_reverse == 100:
+				weight_reverse = 0					# if position is missing (base = '-'), score no binding
 		sites_plus[pos] = weight_plus / weight_consensus		
 		sites_reverse[pos] = weight_reverse / weight_consensus		
 	return (sites_plus, sites_reverse)
@@ -286,7 +300,6 @@ def main(argv=None):
 			seq_site = seq[best_reverse:best_reverse+motif_length]
 			seq_flank_2 = seq[best_reverse+motif_length:min(best_reverse+motif_length+10, len(seq))]
 			fig.text(.1, .05, ' -  strand:  ' + seq_flank_1 + '_' + seq_site + '_' + seq_flank_2)
-
 
 			title_tmp = "{0} sites in {1}".format(motif_names[idx_motif], seq_names[idx_seq])
 			plt.title(title_tmp, size = 18)
