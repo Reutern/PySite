@@ -18,10 +18,10 @@ plt.rcParams['axes.facecolor']='w'
 baseDic = {'A':0, 'a':0, 'C':1, 'c':1, 'G':2, 'g':2, 'T':3, 't':3}
 
 # A simple function that reads the input sequences in the FASTA format
-def read_fasta(seqFile):
+def read_fasta(seq_file):
 	seqs = []
 	seqNames = []
-	f_in = open(seqFile, 'r')
+	f_in = open(seq_file, 'r')
 	while(True):
 		# Read name
 		line_name = f_in.readline()
@@ -38,7 +38,7 @@ def read_fasta(seqFile):
 		# Check sequence 
 		for base in line_seq:
 			if(base not in ['A', 'a', 'C', 'c', 'G', 'g', 'T', 't']):
-				print("Error in file {0}: {1} is not a legal base!".format(seqFile, base))
+				print("Error in file {0}: {1} is not a legal base!".format(seq_file, base))
 				return ValueError
 		seqs.append(line_seq)
 
@@ -48,10 +48,10 @@ def read_fasta(seqFile):
 
 
 # A function that reads the motif file
-def read_wtmx(motifFile, pseudo_counts):
+def read_wtmx(motif_file, pseudo_counts):
 	motifs = []
 	motifNames = []
-	f_in = open(motifFile, 'r')
+	f_in = open(motif_file, 'r')
 	while(True):
 		# Read name
 		line_name = f_in.readline()
@@ -68,7 +68,7 @@ def read_wtmx(motifFile, pseudo_counts):
 		for pos in range(int(length)):
 			line_pwm = f_in.readline().split()
 			if len(line_pwm) != 4:
-				print("Error in file {0}: motif {1} has corrupt position {2}".format(motifFile, name_tmp, pos))
+				print("Error in file {0}: motif {1} has corrupt position {2}".format(motif_file, name_tmp, pos))
 				return ValueError
 			
 			for idx in range(4):
@@ -136,11 +136,11 @@ def read_sites(seq, motif):
 			
  
 # Parameter reading function (from file)
-def read_parameters(parameterFile):
+def read_parameters(parameter_file):
 	params = {} 
-	if not os.path.isfile(parameterFile):
-		sys.exit(parameterFile + " is not a file!")
-	f_in = open(parameterFile, 'r')
+	if not os.path.isfile(parameter_file):
+		sys.exit(parameter_file + " is not a file!")
+	f_in = open(parameter_file, 'r')
 	for line in f_in.readlines():
 		if '=' not in line:	# comment or empty line
 			continue
@@ -148,7 +148,7 @@ def read_parameters(parameterFile):
 	   	key_tmp = line[0].strip()
 		value_tmp = ''
 		if len(line) > 2:
-	   		sys.exit("Wrong format! Can not read " + parameterFile)	 
+	   		sys.exit("Wrong format! Can not read " + parameter_file)	 
 		if not line[1].isspace():
 		   	value_tmp = line[1].split()[0].strip()	# second split to get rid of comments	   			
 		params.update({key_tmp : value_tmp})
@@ -157,8 +157,8 @@ def read_parameters(parameterFile):
 
 
 # Parameter writing function (to file)
-def save_parameters(parameterFile, params):
-	f_in = open(parameterFile, 'w')
+def save_parameters(parameter_file, params):
+	f_in = open(parameter_file, 'w')
 	for par in params.keys():
 		f_in.write(par + ' = ' + str(params[par]) + '\n')
 	f_in.close()
@@ -166,19 +166,18 @@ def save_parameters(parameterFile, params):
 
  
 def main(argv=None):
-
-	seqFile = ''
-	motifFile = ''
-	outputDir = '.'
-	backgroundFile = ''
+	seq_file = ''
+	motif_file = ''
+	output_dir = '.'
+	background_file = ''
 	pseudo_counts = 0
 
 	# Parameter file and reading conditions
-	parameterFile = 'param.txt'
+	parameter_file = 'param.txt'
 	read_parameter_file = False
 	save_parameter_file = True
 
-	doc_string = 'PySite.py -s <input_seq> -m <input_motif> -o <output_dir> [-p <parameterFile> -c <pseudo_counts def=0.0> -b <background_track>]'
+	doc_string = 'PySite.py -s <input_seq> -m <input_motif> -o <output_dir> [-p <parameter_file> -c <pseudo_counts def=0.0> -b <background_track>]'
 
 	try:
 		opts, args = getopt.getopt(argv,"hs:m:c:o:b:p:",[])
@@ -190,58 +189,68 @@ def main(argv=None):
 			print doc_string
 			sys.exit()
 		elif opt in ("-p"):
-			parameterFile = arg
+			parameter_file = arg
 			read_parameter_file = True
 			save_parameter_file = False
 			break
 		elif opt in ("-s"):
-			seqFile = arg
+			seq_file = arg
 		elif opt in ("-m"):
-			motifFile = arg
+			motif_file = arg
 		elif opt in ("-c"):
 			pseudo_counts = float(arg)		
 		elif opt in ("-o"):
-			outputDir = arg
+			output_dir = arg
 		elif opt in ("-b"):
-			backgroundFile = arg
+			background_file = arg
 
-	# Read parameter file		
-	if(seqFile == '' or motifFile == ''):
+	# Check if all important parameters are set
+	if(seq_file == '' or motif_file == '' or output_dir == ''):
 		print 'Reading Parameters'
 		read_parameter_file = True
 		save_parameter_file = False
 
+	# Read parameter file	
 	if (read_parameter_file):
-		params = read_parameters(parameterFile) 
-		seqFile = params['seqFile']
-		motifFile = params['motifFile']
-		outputDir = params['outputDir']
-		backgroundFile = params['backgroundFile']
-		pseudo_counts = float(params['pseudo_counts'])
-
+		params = read_parameters(parameter_file) 
+		try: 
+			seq_file = params['seq_file']
+			motif_file = params['motif_file']
+			output_dir = params['output_dir']
+		except KeyError:
+			sys.exit("Reading Error")
+		try:
+			background_file = params['background_file']
+		except KeyError:
+			pass	# do not update predefined parameter
+		try:
+			pseudo_counts = float(params['pseudo_counts'])
+		except (KeyError, ValueError):
+			pass	# do not update predefined parameter
+			
 	# Save parameters if not specified otherwise
 	if (save_parameter_file):
 		params = {}
-	   	params['seqFile'] = seqFile
-		params['motifFile'] = motifFile
-		params['outputDir'] = outputDir 
-		params['backgroundFile'] = backgroundFile 
+	   	params['seq_file'] = seq_file
+		params['motif_file'] = motif_file
+		params['output_dir'] = output_dir 
+		params['background_file'] = background_file 
 		params['pseudo_counts'] = pseudo_counts 
-		params = save_parameters(parameterFile, params) 
+		params = save_parameters(parameter_file, params) 
 
 	# Test whether input files exist
-	if not os.path.isfile(seqFile):
-		sys.exit(seqFile + " is not a file!")
-	if not os.path.isfile(motifFile):
-		sys.exit(motifFile + " is not a file!")
+	if not os.path.isfile(seq_file):
+		sys.exit(seq_file + " is not a file!")
+	if not os.path.isfile(motif_file):
+		sys.exit(motif_file + " is not a file!")
 
-	# Read background track File if existing
+	# Read background track file if existing
 	background = ''
-	if os.path.isfile(backgroundFile):
-		background = np.genfromtxt(backgroundFile)	
+	if os.path.isfile(background_file):
+		background = np.genfromtxt(background_file)	
 	try: 
-		(seqs, seqNames) = read_fasta(seqFile)
-		(motifs, motifNames) = read_wtmx(motifFile, pseudo_counts)
+		(seqs, seqNames) = read_fasta(seq_file)
+		(motifs, motifNames) = read_wtmx(motif_file, pseudo_counts)
 	except ValueError:
 		print "Reading Error"
 		sys.exit()
@@ -288,7 +297,7 @@ def main(argv=None):
 			ax.set_ylabel("binding weight")
 			if background != '':
 				ax2.set_ylabel("background")
-			fig_name = outputDir + '/sites_' + seqNames[idx_seq] + '_' + motifNames[idx_motif] + '.png' 
+			fig_name = output_dir + '/sites_' + seqNames[idx_seq] + '_' + motifNames[idx_motif] + '.png' 
 			fig.savefig(fig_name, bbox_inches='tight')
 
 
