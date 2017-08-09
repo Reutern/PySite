@@ -112,6 +112,17 @@ def reverse_complement(seq):
 
 # A function for reading the sites of a single motif in a sequnce
 def read_sites(seq, motif, padding=True):
+
+	# Check the motif input. If motif is a list, check if the entry looks like a motif
+	if type(motif) is list:
+		if len(motif) == 1 and type(motif[0]) is np.ndarray and motif[0].shape[1] == 4:		
+			motif = motif[0]
+		else:
+			sys.exit("read_sites() takes np.ndarray as motif input, instead of a list with {} entries!".format(len(motif)))			
+
+	if motif.shape[1] != 4:
+		sys.exit("read_sites(): motif input corrupt. Too many columns: {}".format(motif.shape[1]))					
+
 	seqLength = len(seq)
 	motifLength = len(motif)
 	Npos = seqLength + motifLength + 1
@@ -292,7 +303,7 @@ def main(argv=None):
 	except ValueError:
 		print "Reading Error"
 		sys.exit()
-	
+
 	# go through all sequences and motifs	
 	for idx_seq, seq in enumerate(seqs):
 		for idx_motif, motif in enumerate(motifs):
